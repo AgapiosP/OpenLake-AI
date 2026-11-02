@@ -1,0 +1,11 @@
+order_id,category,product,region,revenue,quantity,order_date
+1001,Electronics,Laptop,Europe,1299.00,1,2026-10-01
+1002,Office,Notebook,Europe,120.00,12,2026-10-02
+1003,Electronics,Monitor,America,680.00,2,2026-10-03
+1004,Home,Lamp,Europe,90.00,3,2026-10-04
+1005,Office,Desk,Asia,499.00,1,2026-10-05
+1006,Electronics,Keyboard,Europe,225.00,3,2026-10-06
+1007,Home,Chair,America,340.00,2,2026-10-07
+1008,Office,Stationery,Europe,75.00,15,2026-10-08
+1009,Electronics,Headphones,Asia,210.00,2,2026-10-09
+1010,Home,Clock,Europe,60.00,2,2026-10-10

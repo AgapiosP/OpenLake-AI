@@ -1,0 +1,98 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: openlake
+      POSTGRES_USER: openlake
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U openlake -d openlake']
+      interval: 5s
+      timeout: 3s
+      retries: 12
+    networks: [internal]
+  api:
+    build: ./backend
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgresql+psycopg://openlake:${POSTGRES_PASSWORD}@postgres:5432/openlake
+      SECRET_KEY: ${SECRET_KEY:?set SECRET_KEY}
+      ENCRYPTION_KEY: ${ENCRYPTION_KEY:?set ENCRYPTION_KEY}
+      FRONTEND_ORIGIN: ${FRONTEND_ORIGIN:-http://localhost:3000}
+      COOKIE_SECURE: ${COOKIE_SECURE:-false}
+      DATA_DIR: /app/storage
+      REDIS_URL: redis://redis:6379/0
+      SPARK_URL: ${SPARK_URL:-}
+      SPARK_TOKEN: ${SPARK_TOKEN:-}
+      SPARK_MIN_BYTES: ${SPARK_MIN_BYTES:-268435456}
+      ICEBERG_AUTO_MAINTENANCE: ${ICEBERG_AUTO_MAINTENANCE:-false}
+      ICEBERG_MAINTENANCE_INTERVAL_MINUTES: ${ICEBERG_MAINTENANCE_INTERVAL_MINUTES:-1440}
+    volumes:
+      - lake_data:/app/storage
+    ports:
+      - '127.0.0.1:8000:8000'
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks: [internal]
+    security_opt: [no-new-privileges:true]
+  redis:
+    image: redis:7-alpine
+    command: ["redis-server", "--maxmemory", "128mb", "--maxmemory-policy", "allkeys-lru", "--save", "", "--appendonly", "no"]
+    restart: unless-stopped
+    networks: [internal]
+  scheduler:
+    build: ./backend
+    command: ["python", "-m", "app.scheduler"]
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgresql+psycopg://openlake:${POSTGRES_PASSWORD}@postgres:5432/openlake
+      SECRET_KEY: ${SECRET_KEY:?set SECRET_KEY}
+      ENCRYPTION_KEY: ${ENCRYPTION_KEY:?set ENCRYPTION_KEY}
+      DATA_DIR: /app/storage
+      REDIS_URL: redis://redis:6379/0
+      SPARK_URL: ${SPARK_URL:-}
+      SPARK_TOKEN: ${SPARK_TOKEN:-}
+      SPARK_MIN_BYTES: ${SPARK_MIN_BYTES:-268435456}
+      ICEBERG_AUTO_MAINTENANCE: ${ICEBERG_AUTO_MAINTENANCE:-false}
+      ICEBERG_MAINTENANCE_INTERVAL_MINUTES: ${ICEBERG_MAINTENANCE_INTERVAL_MINUTES:-1440}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - lake_data:/app/storage
+    networks: [internal]
+    security_opt: [no-new-privileges:true]
+  spark:
+    profiles: ["spark"]
+    build: ./spark
+    restart: unless-stopped
+    environment:
+      SPARK_TOKEN: ${SPARK_TOKEN:-}
+      DATA_DIR: /app/storage
+    volumes:
+      - lake_data:/app/storage
+    networks: [internal]
+    mem_limit: 3g
+    security_opt: [no-new-privileges:true]
+  web:
+    build:
+      context: ./frontend
+      args:
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:8000}
+    restart: unless-stopped
+    environment:
+      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:8000}
+    ports:
+      - '127.0.0.1:3000:3000'
+    depends_on: [api]
+    networks: [internal]
+    security_opt: [no-new-privileges:true]
+volumes:
+  postgres_data:
+  lake_data:
+networks:
+  internal:
